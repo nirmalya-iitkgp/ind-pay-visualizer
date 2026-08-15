@@ -1,0 +1,6 @@
+{
+  "name": "Indian Compensation & Tax Visualizer",
+  "description": "Interactive dual-sided Indian CTC compensation builder, pay structure modeler, Old vs New Tax Regime comparator, and corporate tax shield calculator.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
