@@ -5,6 +5,7 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    base: '/ind-pay-visualizer/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
