@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { RegimeComparison, TaxRegime } from '../types';
-import { formatINR, formatINRCompact } from '../utils/formatters';
-import { Trophy, CheckCircle2, ChevronRight, Scale, Info, ArrowUpRight, Check } from 'lucide-react';
-import confetti from 'canvas-confetti';
+import { formatINR } from '../utils/formatters';
+import { Check, Scale, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface Props {
   comparison: RegimeComparison;
@@ -15,19 +14,10 @@ export const RegimeComparisonCard: React.FC<Props> = ({
   selectedRegime,
   onSelectRegime,
 }) => {
-  const [showSlabDetails, setShowSlabDetails] = useState(false);
+  const [showSlabs, setShowSlabs] = useState(false);
   const { oldRegime, newRegime, recommendedRegime, taxDifferenceAnnual, monthlyTakeHomeDifference } = comparison;
 
   const isNewWinner = recommendedRegime === 'new';
-  const isOldWinner = recommendedRegime === 'old';
-
-  const triggerConfetti = () => {
-    confetti({
-      particleCount: 50,
-      spread: 60,
-      origin: { y: 0.7 },
-    });
-  };
 
   const rows = [
     {
@@ -39,19 +29,25 @@ export const RegimeComparisonCard: React.FC<Props> = ({
     {
       label: 'HRA Exemption (Sec 10(13A))',
       oldVal: formatINR(oldRegime.hraExemption),
-      newVal: 'Not Allowed (₹0)',
+      newVal: '₹0 (Not allowed)',
       highlight: oldRegime.hraExemption > 0 ? 'old' : undefined,
     },
     {
-      label: 'Section 80C (EPF, ELSS, PPF)',
+      label: 'Meal Coupons & LTC Exemption',
+      oldVal: formatINR(oldRegime.mealCouponExemption + oldRegime.ltaExemption),
+      newVal: '₹0 (Not allowed)',
+      highlight: (oldRegime.mealCouponExemption + oldRegime.ltaExemption) > 0 ? 'old' : undefined,
+    },
+    {
+      label: 'Section 80C & Employee NPS (80CCD(1))',
       oldVal: formatINR(oldRegime.chapterVIA80CDeduction),
-      newVal: 'Not Allowed (₹0)',
+      newVal: '₹0 (Not allowed)',
       highlight: oldRegime.chapterVIA80CDeduction > 0 ? 'old' : undefined,
     },
     {
-      label: 'Section 80D & 80CCD(1B)',
+      label: 'Section 80D & 80CCD(1B) Self NPS',
       oldVal: formatINR(oldRegime.chapterVIA80DDeduction + oldRegime.chapterVIA80CCD1BDeduction),
-      newVal: 'Not Allowed (₹0)',
+      newVal: '₹0 (Not allowed)',
       highlight: (oldRegime.chapterVIA80DDeduction + oldRegime.chapterVIA80CCD1BDeduction) > 0 ? 'old' : undefined,
     },
     {
@@ -72,19 +68,31 @@ export const RegimeComparisonCard: React.FC<Props> = ({
       isHeader: true,
     },
     {
-      label: 'Sec 87A Tax Rebate',
+      label: 'Section 87A Rebate',
       oldVal: formatINR(oldRegime.section87ARebate),
       newVal: formatINR(newRegime.section87ARebate),
     },
     {
-      label: 'Total Income Tax + Cess',
+      label: 'Surcharge Amount',
+      oldVal: formatINR(oldRegime.surchargeAmount),
+      newVal: formatINR(newRegime.surchargeAmount),
+      subtext: oldRegime.surchargeRatePercent > 0 || newRegime.surchargeRatePercent > 0 ? 'Applies above ₹50L' : undefined,
+    },
+    {
+      label: 'Marginal Relief (Section 115BAC)',
+      oldVal: oldRegime.marginalRelief > 0 ? `- ${formatINR(oldRegime.marginalRelief)}` : '₹0',
+      newVal: newRegime.marginalRelief > 0 ? `- ${formatINR(newRegime.marginalRelief)}` : '₹0',
+      highlight: newRegime.marginalRelief > 0 ? 'new' : undefined,
+    },
+    {
+      label: 'Total Income Tax + 4% Cess',
       oldVal: formatINR(oldRegime.totalTaxLiabilityAnnual),
       newVal: formatINR(newRegime.totalTaxLiabilityAnnual),
       highlight: oldRegime.totalTaxLiabilityAnnual < newRegime.totalTaxLiabilityAnnual ? 'old' : 'new',
       isHeader: true,
     },
     {
-      label: 'Monthly Take-Home Pay',
+      label: 'Monthly Net Take-Home Pay',
       oldVal: formatINR(oldRegime.monthlyInHandSalary),
       newVal: formatINR(newRegime.monthlyInHandSalary),
       highlight: oldRegime.monthlyInHandSalary > newRegime.monthlyInHandSalary ? 'old' : 'new',
@@ -93,156 +101,133 @@ export const RegimeComparisonCard: React.FC<Props> = ({
   ];
 
   return (
-    <div className="bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs space-y-4" id="regime-comparison-card">
-      
-      {/* Winner Recommendation Banner */}
-      <div
-        className={`p-3.5 rounded-xl border flex items-start gap-3 transition-all ${
-          isNewWinner
-            ? 'bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200 text-emerald-950'
-            : 'bg-gradient-to-r from-indigo-50 to-blue-50 border-indigo-200 text-indigo-950'
-        }`}
-      >
-        <div className={`p-2 rounded-lg ${isNewWinner ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white'} shrink-0 mt-0.5`}>
-          <Trophy className="w-5 h-5" />
-        </div>
-        <div className="flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-extrabold uppercase tracking-wide">
-              {isNewWinner ? 'New Regime (Sec 115BAC) Wins' : 'Old Tax Regime Wins'}
-            </span>
-            <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-white shadow-2xs">
-              Save {formatINR(taxDifferenceAnnual)}/yr
-            </span>
+    <div className="bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs space-y-3.5" id="regime-comparison-card">
+      {/* Recommendation Summary */}
+      <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-between gap-3">
+        <div>
+          <div className="text-xs font-bold text-slate-900">
+            {isNewWinner ? 'New Tax Regime (Section 115BAC) is more beneficial' : 'Old Tax Regime is more beneficial'}
           </div>
-          <p className="text-xs mt-1 leading-relaxed opacity-90">{comparison.summaryReason}</p>
-          
-          {selectedRegime !== recommendedRegime && (
-            <button
-              type="button"
-              onClick={() => {
-                onSelectRegime(recommendedRegime);
-                triggerConfetti();
-              }}
-              className="mt-2 text-xs font-bold inline-flex items-center gap-1 text-emerald-700 hover:text-emerald-900 underline"
-            >
-              Switch to Recommended {isNewWinner ? 'New' : 'Old'} Regime
-              <ArrowUpRight className="w-3.5 h-3.5" />
-            </button>
-          )}
+          <div className="text-[11px] text-slate-600 mt-0.5">
+            Saves {formatINR(Math.abs(taxDifferenceAnnual))}/year (+{formatINR(Math.abs(monthlyTakeHomeDifference))}/month in hand).
+          </div>
         </div>
+
+        <button
+          type="button"
+          onClick={() => onSelectRegime(recommendedRegime)}
+          className="px-2.5 py-1.5 bg-slate-900 text-white rounded-md text-xs font-semibold hover:bg-slate-800 transition-colors shrink-0"
+        >
+          {selectedRegime === recommendedRegime ? 'Active' : 'Apply Winner'}
+        </button>
       </div>
 
-      {/* Regime Toggle Selector */}
-      <div className="flex items-center justify-between pt-1">
-        <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-          <Scale className="w-3.5 h-3.5 text-emerald-600" />
-          Side-by-Side Regime Matrix
-        </span>
+      {/* Regime Selector Tabs */}
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <button
+          type="button"
+          onClick={() => onSelectRegime('new')}
+          className={`p-2 rounded-lg border text-left transition-colors ${
+            selectedRegime === 'new'
+              ? 'border-emerald-600 bg-emerald-50/60 font-bold text-emerald-950'
+              : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span>New Regime (115BAC)</span>
+            {selectedRegime === 'new' && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+          </div>
+          <div className="text-[11px] font-mono text-slate-600 mt-1">
+            {formatINR(newRegime.monthlyInHandSalary)}/mo
+          </div>
+        </button>
 
-        <div className="flex items-center bg-slate-100 p-0.5 rounded-lg text-xs font-semibold">
-          <button
-            type="button"
-            onClick={() => onSelectRegime('new')}
-            className={`px-2 py-1 rounded-md transition-all ${
-              selectedRegime === 'new'
-                ? 'bg-emerald-600 text-white shadow-2xs font-bold'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            New Regime
-          </button>
-          <button
-            type="button"
-            onClick={() => onSelectRegime('old')}
-            className={`px-2 py-1 rounded-md transition-all ${
-              selectedRegime === 'old'
-                ? 'bg-emerald-600 text-white shadow-2xs font-bold'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Old Regime
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => onSelectRegime('old')}
+          className={`p-2 rounded-lg border text-left transition-colors ${
+            selectedRegime === 'old'
+              ? 'border-indigo-600 bg-indigo-50/60 font-bold text-indigo-950'
+              : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span>Old Tax Regime</span>
+            {selectedRegime === 'old' && <Check className="w-3.5 h-3.5 text-indigo-600" />}
+          </div>
+          <div className="text-[11px] font-mono text-slate-600 mt-1">
+            {formatINR(oldRegime.monthlyInHandSalary)}/mo
+          </div>
+        </button>
       </div>
 
       {/* Comparison Table */}
-      <div className="overflow-x-auto border border-slate-200 rounded-lg text-xs">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-[11px] uppercase font-bold">
-              <th className="p-2.5">Component</th>
-              <th className={`p-2.5 text-right ${selectedRegime === 'new' ? 'bg-emerald-50/70 text-emerald-900 font-extrabold' : ''}`}>
-                New Regime (115BAC)
-              </th>
-              <th className={`p-2.5 text-right ${selectedRegime === 'old' ? 'bg-emerald-50/70 text-emerald-900 font-extrabold' : ''}`}>
-                Old Regime
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {rows.map((r, i) => (
-              <tr
-                key={r.label}
-                className={`${r.isHeader ? 'bg-slate-50/60 font-bold text-slate-900' : 'text-slate-700 hover:bg-slate-50/40'}`}
+      <div className="border border-slate-200 rounded-lg overflow-hidden text-xs">
+        <div className="grid grid-cols-3 bg-slate-100 p-2 font-semibold text-slate-700 border-b border-slate-200 text-[11px]">
+          <span>Tax Component</span>
+          <span className="text-right">Old Regime</span>
+          <span className="text-right">New Regime</span>
+        </div>
+
+        <div className="divide-y divide-slate-100">
+          {rows.map((row) => (
+            <div
+              key={row.label}
+              className={`grid grid-cols-3 p-2 items-center text-[11px] ${
+                row.isHeader ? 'bg-slate-50/80 font-bold text-slate-900' : 'text-slate-600'
+              }`}
+            >
+              <div>
+                <span>{row.label}</span>
+                {row.subtext && <span className="block text-[9px] text-slate-400">{row.subtext}</span>}
+              </div>
+              <div
+                className={`text-right font-mono ${
+                  row.highlight === 'old' ? 'text-emerald-700 font-bold' : ''
+                }`}
               >
-                <td className="p-2.5">{r.label}</td>
-                <td
-                  className={`p-2.5 text-right font-mono ${
-                    r.highlight === 'new'
-                      ? 'text-emerald-700 font-bold bg-emerald-50/50'
-                      : ''
-                  }`}
-                >
-                  {r.newVal}
-                </td>
-                <td
-                  className={`p-2.5 text-right font-mono ${
-                    r.highlight === 'old'
-                      ? 'text-emerald-700 font-bold bg-emerald-50/50'
-                      : ''
-                  }`}
-                >
-                  {r.oldVal}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                {row.oldVal}
+              </div>
+              <div
+                className={`text-right font-mono ${
+                  row.highlight === 'new' ? 'text-emerald-700 font-bold' : ''
+                }`}
+              >
+                {row.newVal}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Toggle Slab Tax Breakdown Details */}
-      <div className="pt-1">
+      {/* Slab Details Accordion */}
+      <div className="border border-slate-200 rounded-lg overflow-hidden text-xs">
         <button
           type="button"
-          onClick={() => setShowSlabDetails(!showSlabDetails)}
-          className="text-xs font-semibold text-slate-600 hover:text-slate-900 flex items-center justify-between w-full p-2 rounded-lg bg-slate-50 border border-slate-200/80"
+          onClick={() => setShowSlabs(!showSlabs)}
+          className="w-full p-2.5 bg-slate-50 font-semibold text-slate-700 flex items-center justify-between hover:bg-slate-100"
         >
-          <span className="flex items-center gap-1">
-            <Info className="w-3.5 h-3.5 text-slate-400" />
-            {selectedRegime === 'new' ? 'New Regime FY 24-25/25-26 Slabs Breakdown' : 'Old Regime Slabs Breakdown'}
-          </span>
-          <span className="text-[11px] text-emerald-700 font-bold">
-            {showSlabDetails ? 'Hide' : 'View Slabs'}
-          </span>
+          <span>Tax Slabs Breakdown ({selectedRegime === 'new' ? 'New Regime' : 'Old Regime'})</span>
+          {showSlabs ? <ChevronUp className="w-3.5 h-3.5 text-slate-500" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-500" />}
         </button>
 
-        {showSlabDetails && (
-          <div className="mt-2 p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs space-y-1.5 font-mono">
-            {(selectedRegime === 'new' ? newRegime.slabBreakdown : oldRegime.slabBreakdown).map((slab) => (
-              <div key={slab.slabRange} className="flex items-center justify-between text-slate-700">
-                <span>{slab.slabRange} ({slab.rate}%):</span>
-                <span className="font-semibold text-slate-900">{formatINR(slab.taxAmount)}</span>
+        {showSlabs && (
+          <div className="p-2 space-y-1 bg-white border-t border-slate-100">
+            {(selectedRegime === 'new' ? newRegime.slabBreakdown : oldRegime.slabBreakdown).map((s) => (
+              <div key={s.slabRange} className="flex items-center justify-between text-[11px] py-1 border-b border-slate-50 font-mono">
+                <span className="text-slate-600">
+                  {s.slabRange} ({s.rate}%)
+                </span>
+                <span className="text-slate-900 font-semibold">{formatINR(s.taxAmount)}</span>
               </div>
             ))}
-            <div className="pt-1.5 border-t border-slate-200 flex items-center justify-between font-bold text-slate-900">
-              <span>Slab Tax Total:</span>
-              <span>{formatINR(selectedRegime === 'new' ? newRegime.slabTax : oldRegime.slabTax)}</span>
+            <div className="flex justify-between font-bold text-slate-900 text-xs pt-1.5 font-mono">
+              <span>Total Tax + Cess</span>
+              <span>{formatINR(selectedRegime === 'new' ? newRegime.totalTaxLiabilityAnnual : oldRegime.totalTaxLiabilityAnnual)}</span>
             </div>
           </div>
         )}
       </div>
-
     </div>
   );
 };

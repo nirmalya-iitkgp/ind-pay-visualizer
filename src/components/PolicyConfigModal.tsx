@@ -1,6 +1,7 @@
 import React from 'react';
-import { CompanyPolicy } from '../types';
-import { X, ShieldCheck, HelpCircle, Check, AlertCircle } from 'lucide-react';
+import { CompanyPolicy, CorporateTaxProfileType } from '../types';
+import { CORPORATE_TAX_PROFILES } from '../utils/constants';
+import { X, ShieldCheck } from 'lucide-react';
 
 interface Props {
   isOpen: boolean;
@@ -17,49 +18,57 @@ export const PolicyConfigModal: React.FC<Props> = ({
 }) => {
   if (!isOpen) return null;
 
+  const handleProfileChange = (profileKey: CorporateTaxProfileType) => {
+    const cfg = CORPORATE_TAX_PROFILES[profileKey];
+    if (cfg) {
+      onUpdatePolicy({
+        ...policy,
+        corporateTaxProfile: profileKey,
+        corporateBaseRate: cfg.baseRate,
+        corporateSurchargeRate: cfg.surchargeRate,
+        corporateCessRate: cfg.cessRate,
+        corporateTaxRate: cfg.effectiveRate,
+      });
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4" id="policy-modal-overlay">
+    <div
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+      id="policy-modal-overlay"
+    >
       <div
         id="policy-modal-card"
-        className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full border border-slate-200 overflow-hidden transform transition-all"
+        className="bg-white rounded-xl shadow-2xl max-w-2xl w-full border border-slate-200 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
-              <ShieldCheck className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold tracking-tight">Company Policy & Statutory Engine Settings</h2>
-              <p className="text-xs text-slate-300">Configure Indian employer payroll and retiral compensation rules</p>
-            </div>
+        <div className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <h2 className="text-sm font-bold tracking-tight">Company Policy & Corporate Settings</h2>
           </div>
           <button
             id="close-policy-modal-btn"
             onClick={onClose}
-            className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+            className="p-1 text-slate-400 hover:text-white rounded"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Form Body */}
-        <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto text-sm text-slate-700">
+        {/* Body */}
+        <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto text-xs text-slate-700">
           
-          {/* Section 1: Provident Fund (PF) Policy */}
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-slate-900 text-sm">Provident Fund (PF) Rule</span>
-              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-200 text-slate-700">EPF Act, 1952</span>
-            </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          {/* Section 1: Provident Fund (PF) Rule */}
+          <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 space-y-2">
+            <span className="font-semibold text-slate-900 block">Provident Fund (PF) Statutory Rule</span>
+            <div className="grid grid-cols-2 gap-2">
               <label
-                className={`flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer transition-all ${
+                className={`p-2 rounded border cursor-pointer ${
                   policy.pfCapAtStatutoryLimit
-                    ? 'bg-white border-emerald-500 ring-2 ring-emerald-100'
-                    : 'bg-white/60 border-slate-200 hover:bg-white'
+                    ? 'bg-white border-slate-900 font-bold'
+                    : 'bg-white/60 border-slate-200'
                 }`}
               >
                 <input
@@ -67,21 +76,19 @@ export const PolicyConfigModal: React.FC<Props> = ({
                   name="pfCap"
                   checked={policy.pfCapAtStatutoryLimit}
                   onChange={() => onUpdatePolicy({ ...policy, pfCapAtStatutoryLimit: true })}
-                  className="mt-1 text-emerald-600 focus:ring-emerald-500"
+                  className="sr-only"
                 />
-                <div>
-                  <div className="font-medium text-slate-900 text-xs">Capped at ₹15,000/mo</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
-                    12% on statutory ceiling (₹1,800/mo = ₹21,600/yr). Maximizes monthly in-hand salary.
-                  </div>
+                <div>Capped at ₹15,000/mo</div>
+                <div className="text-[10px] text-slate-500 font-normal mt-0.5">
+                  12% of ₹15k cap (₹1,800/mo = ₹21.6k/yr). Max in-hand.
                 </div>
               </label>
 
               <label
-                className={`flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer transition-all ${
+                className={`p-2 rounded border cursor-pointer ${
                   !policy.pfCapAtStatutoryLimit
-                    ? 'bg-white border-emerald-500 ring-2 ring-emerald-100'
-                    : 'bg-white/60 border-slate-200 hover:bg-white'
+                    ? 'bg-white border-slate-900 font-bold'
+                    : 'bg-white/60 border-slate-200'
                 }`}
               >
                 <input
@@ -89,223 +96,117 @@ export const PolicyConfigModal: React.FC<Props> = ({
                   name="pfCap"
                   checked={!policy.pfCapAtStatutoryLimit}
                   onChange={() => onUpdatePolicy({ ...policy, pfCapAtStatutoryLimit: false })}
-                  className="mt-1 text-emerald-600 focus:ring-emerald-500"
+                  className="sr-only"
                 />
-                <div>
-                  <div className="font-medium text-slate-900 text-xs">Full 12% on Actual Basic</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
-                    Uncapped PF on total Basic Pay. Builds larger retirement corpus, reduces monthly take-home.
-                  </div>
+                <div>Full 12% on Actual Basic</div>
+                <div className="text-[10px] text-slate-500 font-normal mt-0.5">
+                  Uncapped PF on total Basic Pay. Higher retirement corpus.
                 </div>
               </label>
             </div>
+          </div>
 
-            {/* VPF Toggle */}
-            <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
+          {/* Section 2: Gratuity & NPS Policy */}
+          <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 space-y-2">
+            <span className="font-semibold text-slate-900 block">Employer NPS (Section 80CCD(2))</span>
+            <div className="flex items-center justify-between">
               <div>
-                <span className="font-medium text-xs text-slate-900">Voluntary Provident Fund (VPF)</span>
-                <p className="text-[11px] text-slate-500">Enable additional voluntary employee contribution</p>
+                <span className="text-slate-800">Employer NPS Contribution</span>
+                <p className="text-[10px] text-slate-500">Corporate retiral contribution up to 14% of Basic</p>
               </div>
               <div className="flex items-center gap-2">
-                {policy.enableVPF && (
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="number"
-                      min="0"
-                      max="88"
-                      value={policy.vpfPercentage}
-                      onChange={(e) =>
-                        onUpdatePolicy({
-                          ...policy,
-                          vpfPercentage: Math.max(0, Math.min(88, parseFloat(e.target.value) || 0)),
-                        })
-                      }
-                      className="w-16 px-2 py-1 text-xs border border-slate-300 rounded font-medium text-right"
-                    />
-                    <span className="text-xs text-slate-500">% Basic</span>
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => onUpdatePolicy({ ...policy, enableVPF: !policy.enableVPF })}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                    policy.enableVPF ? 'bg-emerald-600' : 'bg-slate-300'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition duration-200 ease-in-out ${
-                      policy.enableVPF ? 'translate-x-4' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Section 2: Gratuity & Retiral Policy */}
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-slate-900 text-sm">Gratuity Accounting Policy</span>
-              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-200 text-slate-700">Payment of Gratuity Act, 1972</span>
-            </div>
-
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <span className="font-medium text-xs text-slate-900">Include Gratuity in Gross CTC</span>
-                <p className="text-[11px] text-slate-500">
-                  Standard 4.81% (15/26 of 1 month basic per completed year) included inside CTC component breakdown.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() =>
-                  onUpdatePolicy({
-                    ...policy,
-                    gratuityIncludedInCTC: !policy.gratuityIncludedInCTC,
-                  })
-                }
-                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                  policy.gratuityIncludedInCTC ? 'bg-emerald-600' : 'bg-slate-300'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition duration-200 ease-in-out ${
-                    policy.gratuityIncludedInCTC ? 'translate-x-4' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
-          </div>
-
-          {/* Section 3: Employer NPS & Superannuation */}
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-slate-900 text-sm">Corporate NPS & Superannuation</span>
-              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-200 text-slate-700">Sec 80CCD(2) & 17(2)(vii)</span>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="font-medium text-xs text-slate-900">Employer NPS Contribution</span>
-                <p className="text-[11px] text-slate-500">Tax deductible for employee under both Old and New Tax Regimes</p>
-              </div>
-              <div className="flex items-center gap-2">
-                {policy.employerNpsEnabled && (
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="number"
-                      min="1"
-                      max="14"
-                      value={policy.employerNpsPercent}
-                      onChange={(e) =>
-                        onUpdatePolicy({
-                          ...policy,
-                          employerNpsPercent: Math.max(0, Math.min(14, parseFloat(e.target.value) || 0)),
-                        })
-                      }
-                      className="w-16 px-2 py-1 text-xs border border-slate-300 rounded font-medium text-right"
-                    />
-                    <span className="text-xs text-slate-500">% Basic</span>
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() =>
-                    onUpdatePolicy({
-                      ...policy,
-                      employerNpsEnabled: !policy.employerNpsEnabled,
-                    })
-                  }
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                    policy.employerNpsEnabled ? 'bg-emerald-600' : 'bg-slate-300'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition duration-200 ease-in-out ${
-                      policy.employerNpsEnabled ? 'translate-x-4' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-900 flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-              <span>
-                <strong>Sec 17(2)(vii) Ceiling Rule:</strong> Combined Employer PF + Employer NPS + Superannuation exceeding <strong>₹7,50,000 annually</strong> is automatically treated as taxable salary perquisite.
-              </span>
-            </div>
-          </div>
-
-          {/* Section 4: RSU Cross-Charge & Corporate Tax Shield */}
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-slate-900 text-sm">Equity Cross-Charge & Corporate Tax</span>
-              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-200 text-slate-700">Sec 37(1) Deductibility</span>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="font-medium text-xs text-slate-900">RSU/ESOP Cross-Charge to Indian Entity</span>
-                <p className="text-[11px] text-slate-500">
-                  When enabled, vested RSU expenses are invoiced to the Indian subsidiary, making them deductible corporate business expenses.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() =>
-                  onUpdatePolicy({
-                    ...policy,
-                    rsuCrossChargedToLocalEntity: !policy.rsuCrossChargedToLocalEntity,
-                  })
-                }
-                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                  policy.rsuCrossChargedToLocalEntity ? 'bg-emerald-600' : 'bg-slate-300'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition duration-200 ease-in-out ${
-                    policy.rsuCrossChargedToLocalEntity ? 'translate-x-4' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
-
-            <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
-              <div>
-                <span className="font-medium text-xs text-slate-900">Effective Corporate Tax Rate</span>
-                <p className="text-[11px] text-slate-500">Used to calculate Corporate Tax Shield savings on CTC</p>
-              </div>
-              <div className="flex items-center gap-1">
                 <input
                   type="number"
-                  step="0.01"
-                  min="15"
-                  max="35"
-                  value={policy.corporateTaxRate}
+                  min="0"
+                  max="14"
+                  value={policy.employerNpsPercent}
                   onChange={(e) =>
                     onUpdatePolicy({
                       ...policy,
-                      corporateTaxRate: Math.max(0, Math.min(50, parseFloat(e.target.value) || 25.17)),
+                      employerNpsEnabled: parseFloat(e.target.value) > 0,
+                      employerNpsPercent: Math.max(0, Math.min(14, parseFloat(e.target.value) || 0)),
                     })
                   }
-                  className="w-20 px-2 py-1 text-xs border border-slate-300 rounded font-medium text-right"
+                  className="w-14 px-2 py-1 text-xs border border-slate-200 rounded font-mono text-right bg-white"
                 />
-                <span className="text-xs text-slate-500">%</span>
+                <span className="text-slate-500">% Basic</span>
               </div>
+            </div>
+          </div>
+
+          {/* Section 3: Corporate Tax Profile & Surcharges */}
+          <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 space-y-2.5">
+            <span className="font-semibold text-slate-900 block">
+              Corporate Tax Regime & Surcharge Slab (Turnover-based)
+            </span>
+
+            <div>
+              <label className="text-[10px] text-slate-500 block mb-0.5">Company Tax Profile</label>
+              <select
+                value={policy.corporateTaxProfile || 'sec_115baa'}
+                onChange={(e) => handleProfileChange(e.target.value as CorporateTaxProfileType)}
+                className="w-full px-2 py-1.5 text-xs font-semibold text-slate-900 border border-slate-200 rounded bg-white"
+              >
+                {Object.values(CORPORATE_TAX_PROFILES).map((prof) => (
+                  <option key={prof.profile} value={prof.profile}>
+                    {prof.name} — {prof.effectiveRate}%
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 p-2 bg-white rounded border border-slate-200 text-center font-mono">
+              <div>
+                <span className="text-[9px] text-slate-400 block">Base Tax</span>
+                <span className="font-bold text-slate-900">{policy.corporateBaseRate || 22}%</span>
+              </div>
+              <div>
+                <span className="text-[9px] text-slate-400 block">Surcharge</span>
+                <span className="font-bold text-slate-900">{policy.corporateSurchargeRate || 10}%</span>
+              </div>
+              <div>
+                <span className="text-[9px] text-slate-400 block">4% HE Cess</span>
+                <span className="font-bold text-slate-900">4%</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-slate-600 font-medium">Effective Corporate Rate:</span>
+              <span className="font-mono font-bold text-slate-900 text-sm">
+                {policy.corporateTaxRate}%
+              </span>
+            </div>
+
+            {/* RSU Cross Charge */}
+            <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
+              <div>
+                <span className="text-slate-800 font-medium">RSU Cross-Charging to Entity</span>
+                <p className="text-[10px] text-slate-500">Makes RSU expense corporate tax-deductible u/s 37(1)</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={policy.rsuCrossChargedToLocalEntity}
+                onChange={(e) =>
+                  onUpdatePolicy({
+                    ...policy,
+                    rsuCrossChargedToLocalEntity: e.target.checked,
+                  })
+                }
+                className="rounded text-slate-900 w-4 h-4 cursor-pointer"
+              />
             </div>
           </div>
 
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3.5 bg-slate-100 border-t border-slate-200 flex justify-end">
+        <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex justify-end">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition-colors shadow-xs"
+            className="px-3.5 py-1.5 bg-slate-900 text-white rounded text-xs font-semibold hover:bg-slate-800"
           >
-            Apply Policy Rules
+            Apply Settings
           </button>
         </div>
       </div>

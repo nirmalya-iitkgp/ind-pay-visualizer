@@ -28,10 +28,13 @@ export const SalarySlipModal: React.FC<Props> = ({
 
   const monthlyEmpPF = breakdown.employeePFAnnual / 12;
   const monthlyEmpVPF = breakdown.employeeVPFAnnual / 12;
+  const monthlyEmpNps1 = breakdown.employeeNpsTier1Annual / 12;
+  const monthlyEmpNps2 = breakdown.employeeNpsTier2Annual / 12;
   const monthlyPT = breakdown.professionalTaxAnnual / 12;
   const monthlyTDS = taxResult.totalTaxLiabilityMonthly;
 
-  const totalMonthlyDeductions = monthlyEmpPF + monthlyEmpVPF + monthlyPT + monthlyTDS;
+  const totalMonthlyDeductions =
+    monthlyEmpPF + monthlyEmpVPF + monthlyEmpNps1 + monthlyEmpNps2 + monthlyPT + monthlyTDS;
   const netMonthlySalary = monthlyGross - totalMonthlyDeductions;
 
   const handlePrint = () => {
@@ -151,6 +154,18 @@ NET IN-HAND TAKE HOME: ${formatINR(netMonthlySalary)}/mo (Annual: ${formatINR(ne
                   <div className="flex justify-between">
                     <span className="font-sans text-slate-700">Voluntary PF (VPF)</span>
                     <span className="font-semibold">{formatINR(monthlyEmpVPF)}</span>
+                  </div>
+                )}
+                {monthlyEmpNps1 > 0 && (
+                  <div className="flex justify-between">
+                    <span className="font-sans text-slate-700">Employee NPS (Tier-I)</span>
+                    <span className="font-semibold">{formatINR(monthlyEmpNps1)}</span>
+                  </div>
+                )}
+                {monthlyEmpNps2 > 0 && (
+                  <div className="flex justify-between">
+                    <span className="font-sans text-slate-700">NPS Tier-II (Liquid)</span>
+                    <span className="font-semibold">{formatINR(monthlyEmpNps2)}</span>
                   </div>
                 )}
                 <div className="flex justify-between">

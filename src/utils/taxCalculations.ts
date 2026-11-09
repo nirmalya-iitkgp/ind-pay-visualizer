@@ -13,11 +13,10 @@ import {
   VestingYearDetail,
   IndianState,
 } from '../types';
-import { STATUTORY_LIMITS, STATE_PT_CONFIGS, CITY_HRA_NUANCES } from './constants';
+import { STATUTORY_LIMITS, STATE_PT_CONFIGS, CITY_HRA_NUANCES, CORPORATE_TAX_PROFILES } from './constants';
 
 /**
  * Helper to compute State-specific Professional Tax
- * Based on monthly gross salary and state-mandated slabs.
  */
 export function computeStateProfessionalTax(
   monthlyGrossSalary: number,
@@ -28,7 +27,7 @@ export function computeStateProfessionalTax(
   const stateConfig = STATE_PT_CONFIGS[state] || STATE_PT_CONFIGS.other;
 
   if (isOverridden && manualOverride !== undefined && manualOverride >= 0) {
-    const cappedAnnual = Math.min(2500, manualOverride); // Max Article 276(2) Constitution cap
+    const cappedAnnual = Math.min(2500, manualOverride);
     return {
       annualTax: cappedAnnual,
       monthlyTax: cappedAnnual / 12,
@@ -40,7 +39,6 @@ export function computeStateProfessionalTax(
     return { annualTax: 0, monthlyTax: 0, stateConfig };
   }
 
-  // Find matching slab
   const matchedSlab = stateConfig.slabs.find(
     (slab) => monthlyGrossSalary >= slab.minMonthlySalary && monthlyGrossSalary <= slab.maxMonthlySalary
   );
@@ -48,7 +46,6 @@ export function computeStateProfessionalTax(
   let monthlyTax = matchedSlab ? matchedSlab.monthlyTax : 0;
   let annualTax = 0;
 
-  // Month-by-month calculation to account for February specific taxes (like Maharashtra)
   for (let month = 1; month <= 12; month++) {
     if (matchedSlab?.specialMonthTax && matchedSlab.specialMonthTax.month === month) {
       annualTax += matchedSlab.specialMonthTax.tax;
@@ -57,7 +54,6 @@ export function computeStateProfessionalTax(
     }
   }
 
-  // Constitutional upper limit under Article 276(2)
   annualTax = Math.min(2500, annualTax);
 
   return {
@@ -76,18 +72,18 @@ export function computeCompensationBreakdown(
 ): CompensationBreakdown {
   const ctc = Math.max(0, inputs.ctcAnnual);
 
-  // 1. Basic Pay Calculation
+  // 1. Basic Pay
   let basicAnnual =
     inputs.customBasicAnnual !== undefined && inputs.customBasicAnnual > 0
       ? inputs.customBasicAnnual
       : (ctc * Math.max(0, inputs.basicPercentOfCTC)) / 100;
   basicAnnual = Math.min(ctc, Math.max(0, basicAnnual));
 
-  // 2. HRA Calculation
+  // 2. HRA
   const hraPercent = Math.max(0, inputs.hraPercentOfBasic || policy.defaultHraPercentOfBasic);
   const hraAnnual = Math.min(ctc, (basicAnnual * hraPercent) / 100);
 
-  // 3. Employer Retirals Calculation
+  // 3. Employer Retirals
   let employerPFAnnual = 0;
   if (policy.pfCapAtStatutoryLimit) {
     const monthlyPfWage = Math.min(basicAnnual / 12, STATUTORY_LIMITS.PF_MONTHLY_WAGE_CEILING);
@@ -139,11 +135,11 @@ export function computeCompensationBreakdown(
     rsuVestedAnnual;
 
   const unallocatedSpillover = ctc - fixedAllocated;
-  const isOverAllocated = unallocatedSpillover < -1; // tolerance
+  const isOverAllocated = unallocatedSpillover < -1;
   const specialAllowanceAnnual = Math.max(0, unallocatedSpillover);
   const totalAllocated = fixedAllocated + specialAllowanceAnnual;
 
-  // 6. Gross Salary (Cash earnings subject to income tax per pay slip)
+  // 6. Gross Salary
   const grossSalaryAnnual =
     basicAnnual +
     hraAnnual +
@@ -153,7 +149,7 @@ export function computeCompensationBreakdown(
     variablePayAnnual +
     rsuVestedAnnual;
 
-  // 7. State Professional Tax Calculation
+  // 7. State Professional Tax
   const monthlyGross = grossSalaryAnnual / 12;
   const ptResult = computeStateProfessionalTax(
     monthlyGross,
@@ -164,12 +160,13 @@ export function computeCompensationBreakdown(
   const professionalTaxAnnual = ptResult.annualTax;
   const professionalTaxMonthly = ptResult.monthlyTax;
 
-  // 8. Employee Pay Slip Deductions
+  // 8. Employee Deductions
   const employeePFAnnual = employerPFAnnual;
   const employeeVPFAnnual = policy.enableVPF ? (basicAnnual * Math.max(0, policy.vpfPercentage || 0)) / 100 : 0;
-  const employeeNPSAnnual = 0;
+  const employeeNpsTier1Annual = (basicAnnual * Math.max(0, Math.min(10, inputs.employeeNpsTier1Percent || 0))) / 100;
+  const employeeNpsTier2Annual = Math.max(0, inputs.employeeNpsTier2Annual || 0);
 
-  // 9. Sec 17(2)(vii) Retiral Perquisite Check:
+  // 9. Sec 17(2)(vii) Retiral Perquisite
   const combinedRetirals = employerPFAnnual + employerNPSAnnual + superannuationAnnual;
   const retiralPerquisiteTaxable = Math.max(0, combinedRetirals - STATUTORY_LIMITS.RETIRAL_PERQUISITE_ANNUAL_CAP);
 
@@ -180,6 +177,7 @@ export function computeCompensationBreakdown(
     specialAllowanceAnnual,
     ltaAnnual,
     otherAllowancesAnnual,
+    foodCouponAnnual,
     variablePayAnnual,
     employerPFAnnual,
     gratuityAnnual,
@@ -191,7 +189,8 @@ export function computeCompensationBreakdown(
     grossSalaryAnnual,
     employeePFAnnual,
     employeeVPFAnnual,
-    employeeNPSAnnual,
+    employeeNpsTier1Annual,
+    employeeNpsTier2Annual,
     professionalTaxAnnual,
     professionalTaxMonthly,
     stateApplied: inputs.state || 'karnataka',
@@ -261,51 +260,94 @@ export function computeHRAExemption(
 }
 
 /**
- * 3. Compute Surcharge & Marginal Relief
+ * 3. Exact Surcharge & Marginal Relief Calculator
+ * Covers New Tax Regime (Section 115BAC) & Old Tax Regime
+ * Smooths out the cliff edge above ₹50L, ₹1Cr, ₹2Cr (and ₹5Cr in Old Regime).
  */
 export function computeSurchargeAndRelief(
   taxableIncome: number,
   baseTax: number,
   isNewRegime: boolean
-): { surchargeAmount: number; surchargeRatePercent: number; marginalRelief: number } {
+): { surchargeAmount: number; surchargeRatePercent: number; marginalRelief: number; thresholdPassed: number } {
   if (taxableIncome <= 5000000 || baseTax <= 0) {
-    return { surchargeAmount: 0, surchargeRatePercent: 0, marginalRelief: 0 };
+    return { surchargeAmount: 0, surchargeRatePercent: 0, marginalRelief: 0, thresholdPassed: 0 };
   }
 
   let rate = 0;
   let threshold = 5000000;
+  let baseTaxAtThreshold = 0;
+  let surchargeAtThreshold = 0;
 
-  if (taxableIncome > 5000000 && taxableIncome <= 10000000) {
-    rate = 0.1;
-    threshold = 5000000;
-  } else if (taxableIncome > 10000000 && taxableIncome <= 20000000) {
-    rate = 0.15;
-    threshold = 10000000;
-  } else if (taxableIncome > 20000000 && taxableIncome <= 50000000) {
-    rate = 0.25;
-    threshold = 20000000;
-  } else if (taxableIncome > 50000000) {
-    rate = isNewRegime ? 0.25 : 0.37;
-    threshold = 50000000;
+  if (isNewRegime) {
+    // New Regime: 0-3L 0%, 3-7L 5% (20k), 7-10L 10% (30k), 10-12L 15% (30k), 12-15L 20% (60k) = 1.4L up to 15L
+    // At 50L: 1.4L + 30% of 35L = 11.90L. Surcharge = 0. Total = 11.90L
+    // At 1Cr: 11.90L + 30% of 50L = 26.90L. Surcharge @ 10% = 2.69L. Total = 29.59L
+    // At 2Cr: 11.90L + 30% of 1.5Cr = 56.90L. Surcharge @ 15% = 8.535L. Total = 65.435L
+    if (taxableIncome > 5000000 && taxableIncome <= 10000000) {
+      rate = 0.1;
+      threshold = 5000000;
+      baseTaxAtThreshold = 1190000;
+      surchargeAtThreshold = 0;
+    } else if (taxableIncome > 10000000 && taxableIncome <= 20000000) {
+      rate = 0.15;
+      threshold = 10000000;
+      baseTaxAtThreshold = 2690000;
+      surchargeAtThreshold = 269000;
+    } else {
+      // > 20000000 (New regime surcharge is capped at 25%)
+      rate = 0.25;
+      threshold = 20000000;
+      baseTaxAtThreshold = 5690000;
+      surchargeAtThreshold = 853500;
+    }
+  } else {
+    // Old Regime: 0-2.5L 0%, 2.5-5L 5% (12.5k), 5-10L 20% (1L) = 1.125L up to 10L
+    // At 50L: 1.125L + 30% of 40L = 13.125L. Surcharge = 0. Total = 13.125L
+    // At 1Cr: 13.125L + 30% of 50L = 28.125L. Surcharge @ 10% = 2.8125L. Total = 30.9375L
+    // At 2Cr: 13.125L + 30% of 1.5Cr = 58.125L. Surcharge @ 15% = 8.71875L. Total = 66.84375L
+    // At 5Cr: 13.125L + 30% of 4.5Cr = 148.125L. Surcharge @ 25% = 37.03125L. Total = 185.15625L
+    if (taxableIncome > 5000000 && taxableIncome <= 10000000) {
+      rate = 0.1;
+      threshold = 5000000;
+      baseTaxAtThreshold = 1312500;
+      surchargeAtThreshold = 0;
+    } else if (taxableIncome > 10000000 && taxableIncome <= 20000000) {
+      rate = 0.15;
+      threshold = 10000000;
+      baseTaxAtThreshold = 2812500;
+      surchargeAtThreshold = 281250;
+    } else if (taxableIncome > 20000000 && taxableIncome <= 50000000) {
+      rate = 0.25;
+      threshold = 20000000;
+      baseTaxAtThreshold = 5812500;
+      surchargeAtThreshold = 871875;
+    } else {
+      rate = 0.37;
+      threshold = 50000000;
+      baseTaxAtThreshold = 14812500;
+      surchargeAtThreshold = 3703125;
+    }
   }
 
-  let surchargeAmount = baseTax * rate;
+  const rawSurcharge = baseTax * rate;
   let marginalRelief = 0;
 
   const excessIncome = taxableIncome - threshold;
-  const approxThresholdTax = baseTax * (threshold / taxableIncome);
-  const maxAllowableTaxAndSurcharge = approxThresholdTax + excessIncome;
-  const currentTotal = baseTax + surchargeAmount;
+  const totalTaxAtThreshold = baseTaxAtThreshold + surchargeAtThreshold;
+  const maxAllowableTaxAndSurcharge = totalTaxAtThreshold + excessIncome;
+  const currentTotal = baseTax + rawSurcharge;
 
   if (currentTotal > maxAllowableTaxAndSurcharge && excessIncome > 0) {
     marginalRelief = currentTotal - maxAllowableTaxAndSurcharge;
-    surchargeAmount = Math.max(0, surchargeAmount - marginalRelief);
   }
 
+  const finalSurcharge = Math.max(0, rawSurcharge - marginalRelief);
+
   return {
-    surchargeAmount: Math.max(0, surchargeAmount),
+    surchargeAmount: finalSurcharge,
     surchargeRatePercent: rate * 100,
     marginalRelief: Math.max(0, marginalRelief),
+    thresholdPassed: threshold,
   };
 }
 
@@ -331,10 +373,17 @@ export function computeOldTax(
     inputs.selectedCity
   );
 
+  // LTA & Meal Coupons (Rule 3(7)(iii)) Exemption
   const ltaExemption = Math.min(breakdown.ltaAnnual, inputs.ltaAnnual || 0);
+  const mealCouponExemption = Math.min(
+    STATUTORY_LIMITS.MEAL_COUPON_ANNUAL_EXEMPT_LIMIT,
+    breakdown.foodCouponAnnual
+  );
 
   // Chapter VI-A Deductions
-  const statutory80CFromPF = breakdown.employeePFAnnual + breakdown.employeeVPFAnnual;
+  // Statutory 80C Pool: Employee PF + VPF + Employee NPS Tier-1 (80CCD(1)) + user 80C
+  const statutory80CFromPF =
+    breakdown.employeePFAnnual + breakdown.employeeVPFAnnual + breakdown.employeeNpsTier1Annual;
   const user80C = Math.max(0, inputs.deduction80C || 0);
   const chapterVIA80CDeduction = Math.min(
     STATUTORY_LIMITS.SECTION_80C_MAX,
@@ -346,11 +395,13 @@ export function computeOldTax(
     Math.max(0, inputs.deduction80D || 0)
   );
 
+  // Additional Self NPS under Section 80CCD(1B) (exclusive of 80C)
   const chapterVIA80CCD1BDeduction = Math.min(
     STATUTORY_LIMITS.SECTION_80CCD1B_NPS_MAX,
     Math.max(0, inputs.deduction80CCD1B || 0)
   );
 
+  // Employer NPS under Section 80CCD(2)
   const employerNPSDeduction80CCD2 = breakdown.employerNPSAnnual;
 
   const homeLoanDeductionSec24b = Math.min(
@@ -374,6 +425,7 @@ export function computeOldTax(
     profTax +
     hraExemption +
     ltaExemption +
+    mealCouponExemption +
     chapterVIA80CDeduction +
     chapterVIA80DDeduction +
     chapterVIA80CCD1BDeduction +
@@ -450,7 +502,13 @@ export function computeOldTax(
   const effectiveTaxRatePercent = grossIncome > 0 ? (totalTaxLiabilityAnnual / grossIncome) * 100 : 0;
 
   const annualInHandSalary =
-    grossIncome - totalTaxLiabilityAnnual - breakdown.employeePFAnnual - breakdown.employeeVPFAnnual - profTax;
+    grossIncome -
+    totalTaxLiabilityAnnual -
+    breakdown.employeePFAnnual -
+    breakdown.employeeVPFAnnual -
+    breakdown.employeeNpsTier1Annual -
+    breakdown.employeeNpsTier2Annual -
+    profTax;
   const monthlyInHandSalary = annualInHandSalary / 12;
 
   return {
@@ -460,6 +518,7 @@ export function computeOldTax(
     hraExemption,
     hraExemptionStateNote: stateNuanceNote,
     ltaExemption,
+    mealCouponExemption,
     chapterVIA80CDeduction,
     chapterVIA80DDeduction,
     chapterVIA80CCD1BDeduction,
@@ -572,7 +631,13 @@ export function computeNewTax(
 
   const profTax = breakdown.professionalTaxAnnual;
   const annualInHandSalary =
-    grossIncome - totalTaxLiabilityAnnual - breakdown.employeePFAnnual - breakdown.employeeVPFAnnual - profTax;
+    grossIncome -
+    totalTaxLiabilityAnnual -
+    breakdown.employeePFAnnual -
+    breakdown.employeeVPFAnnual -
+    breakdown.employeeNpsTier1Annual -
+    breakdown.employeeNpsTier2Annual -
+    profTax;
   const monthlyInHandSalary = annualInHandSalary / 12;
 
   return {
@@ -581,6 +646,7 @@ export function computeNewTax(
     standardDeduction,
     hraExemption: 0,
     ltaExemption: 0,
+    mealCouponExemption: 0,
     chapterVIA80CDeduction: 0,
     chapterVIA80DDeduction: 0,
     chapterVIA80CCD1BDeduction: 0,
@@ -647,12 +713,20 @@ export function compareRegimes(
 
 /**
  * 7. Compute Employer Corporate Tax Shield & Effective Net Outlay
+ * Includes Base Tax + Corporate Surcharge + 4% Higher Education Cess
  */
 export function computeEmployerShield(
   breakdown: CompensationBreakdown,
   policy: CompanyPolicy
 ): EmployerTaxShield {
-  const corpTaxRate = policy.corporateTaxRate || 25.17;
+  const profileKey = policy.corporateTaxProfile || 'sec_115baa';
+  const profileConfig = CORPORATE_TAX_PROFILES[profileKey];
+
+  const baseCorporateTaxRate = profileConfig ? profileConfig.baseRate : policy.corporateBaseRate || 22;
+  const surchargeRatePercent = profileConfig ? profileConfig.surchargeRate : policy.corporateSurchargeRate || 10;
+  const cessRatePercent = profileConfig ? profileConfig.cessRate : policy.corporateCessRate || 4;
+  const corporateTaxRate = profileConfig ? profileConfig.effectiveRate : policy.corporateTaxRate || 25.17;
+  const taxProfileName = profileConfig ? profileConfig.name : 'Custom Domestic Profile';
 
   const basicAndAllowances =
     breakdown.basicAnnual +
@@ -685,7 +759,7 @@ export function computeEmployerShield(
     rsuCrossChargeDeductible;
 
   const totalNonDeductible = rsuNonDeductible;
-  const corporateTaxShieldAmount = totalDeductible * (corpTaxRate / 100);
+  const corporateTaxShieldAmount = totalDeductible * (corporateTaxRate / 100);
   const effectiveEmployerNetCost = breakdown.ctcAnnual - corporateTaxShieldAmount;
   const taxSavingsPercentOfCTC =
     breakdown.ctcAnnual > 0 ? (corporateTaxShieldAmount / breakdown.ctcAnnual) * 100 : 0;
@@ -705,7 +779,11 @@ export function computeEmployerShield(
       otherNonDeductible: 0,
       totalNonDeductible,
     },
-    corporateTaxRate: corpTaxRate,
+    taxProfileName,
+    baseCorporateTaxRate,
+    surchargeRatePercent,
+    cessRatePercent,
+    corporateTaxRate,
     corporateTaxShieldAmount,
     effectiveEmployerNetCost,
     taxSavingsPercentOfCTC,
@@ -715,10 +793,10 @@ export function computeEmployerShield(
 /**
  * 8. Comprehensive RSU / ESOP Taxation Engine
  * Models:
- * 1. Vesting Schedules (Cliff, Graded Equal, Graded Backloaded, Custom) across FYs
- * 2. Perquisite Tax at Vesting (Stage 1)
- * 3. Capital Gains (Stage 2) & Disqualifying Dispositions (STCG vs LTCG)
- * 4. Reload RSUs (Automatic re-grant upon tax withholding)
+ * 1. Vesting Schedules
+ * 2. Stage 1 Perquisite Valuation & Startup ESOP Deferral under Sec 80-IAC / 192(1C)
+ * 3. Capital Gains (Stage 2) & Disqualifying Dispositions
+ * 4. Reload RSUs
  */
 export function computeRSUTaxation(
   details: RSUTaxDetails,
@@ -807,6 +885,22 @@ export function computeRSUTaxation(
   const perquisiteValueINR = unitsVestingCurrentFY * fmvVestingINR;
   const perquisiteTaxINR = perquisiteValueINR * (applicableIncomeTaxRatePercent / 100);
 
+  // Startup ESOP Deferral (Section 80-IAC / Section 192(1C))
+  const isStartupEligible = Boolean(details.isDPIITStartupEligible);
+  let isTdsDeferred = false;
+  let tdsDeferredAmountINR = 0;
+  let immediateTdsPayableINR = perquisiteTaxINR;
+  let deferralDueDateNote = 'Stage 1 TDS withheld at vesting.';
+
+  if (isStartupEligible) {
+    isTdsDeferred = true;
+    tdsDeferredAmountINR = perquisiteTaxINR;
+    immediateTdsPayableINR = 0;
+    deferralDueDateNote = `TDS deferred under Section 192(1C) for up to ${
+      details.deferralYearsLimit || 5
+    } years from end of relevant FY or until share sale / resignation.`;
+  }
+
   // 3. Stage 2: Disposition / Sale & Disqualifying Disposition Evaluation
   let soldUnits = 0;
   if (details.dispositionAction === 'sell_all') {
@@ -870,7 +964,7 @@ export function computeRSUTaxation(
     } months, generating future taxable salary perquisite.`;
   }
 
-  const totalTaxPaidINR = perquisiteTaxINR + capitalGainsTaxINR;
+  const totalTaxPaidINR = immediateTdsPayableINR + capitalGainsTaxINR;
   const retainedUnsoldUnits = Math.max(0, unitsVestingCurrentFY - soldUnits);
   const retainedValueINR = retainedUnsoldUnits * fmvVestingINR;
   const netRealizedGainINR = totalSaleProceedsINR + retainedValueINR - totalTaxPaidINR;
@@ -880,6 +974,10 @@ export function computeRSUTaxation(
     perquisiteValueINR,
     perquisiteTaxINR,
     effectiveMarginalTaxRate: applicableIncomeTaxRatePercent,
+    isTdsDeferred,
+    tdsDeferredAmountINR,
+    immediateTdsPayableINR,
+    deferralDueDateNote,
     vestingScheduleBreakdown: scheduleBreakdown,
     soldUnits,
     costOfAcquisitionPerUnitINR,
@@ -902,6 +1000,7 @@ export function computeRSUTaxation(
 
 /**
  * 9. Real-time Compliance, Guardrails & Smart Alerts
+ * Brutally pruned to show only critical guardrails without fluff or filler!
  */
 export function computeComplianceAlerts(
   breakdown: CompensationBreakdown,
@@ -910,36 +1009,20 @@ export function computeComplianceAlerts(
 ): ComplianceAlert[] {
   const alerts: ComplianceAlert[] = [];
 
-  // 1. Over-allocation Error
+  // 1. Over-allocation Error (Critical blocker)
   if (breakdown.isOverAllocated) {
     alerts.push({
       id: 'over-allocation-error',
       type: 'error',
       title: 'CTC Over-Allocated',
-      message: `Total components exceed CTC by ${new Intl.NumberFormat('en-IN', {
-        style: 'currency',
-        currency: 'INR',
-        maximumFractionDigits: 0,
-      }).format(Math.abs(breakdown.unallocatedSpillover))}. Please reduce component percentages or allowances.`,
+      message: `Total components exceed CTC by ₹${Math.round(Math.abs(breakdown.unallocatedSpillover)).toLocaleString(
+        'en-IN'
+      )}. Reduce component percentages or allowances.`,
       sectionReference: 'Auto-Balancing',
     });
   }
 
-  // 2. Code on Wages Guideline (Basic Pay < 50% CTC)
-  const basicRatio = breakdown.ctcAnnual > 0 ? (breakdown.basicAnnual / breakdown.ctcAnnual) * 100 : 0;
-  if (basicRatio < 50) {
-    alerts.push({
-      id: 'code-on-wages-warning',
-      type: 'warning',
-      title: 'Code on Wages Advisory',
-      message: `Basic Pay is ${basicRatio.toFixed(
-        1
-      )}% of CTC. The recommended Indian wage practice under the Code on Wages suggests Basic Pay ≥ 50% to prevent excessive gratuity & retiral restructuring.`,
-      sectionReference: 'Code on Wages, 2019',
-    });
-  }
-
-  // 3. Section 17(2)(vii) Retiral Perquisite Cap (> ₹7.5 Lakhs)
+  // 2. Section 17(2)(vii) Retiral Perquisite Cap (> ₹7.5 Lakhs)
   const combinedRetirals =
     breakdown.employerPFAnnual + breakdown.employerNPSAnnual + breakdown.superannuationAnnual;
   if (combinedRetirals > STATUTORY_LIMITS.RETIRAL_PERQUISITE_ANNUAL_CAP) {
@@ -950,100 +1033,21 @@ export function computeComplianceAlerts(
       title: 'Retiral Perquisite Tax Triggered',
       message: `Employer PF + NPS + Superannuation total ₹${(combinedRetirals / 100000).toFixed(
         2
-      )}L, exceeding the ₹7.50L statutory ceiling. The excess ₹${(excess / 100000).toFixed(
-        2
-      )}L is added to taxable salary as perquisite under Sec 17(2)(vii).`,
-      sectionReference: 'Income Tax Act Sec 17(2)(vii)',
+      )}L (exceeds ₹7.50L cap). Excess ₹${(excess / 100000).toFixed(2)}L added to taxable salary.`,
+      sectionReference: 'Sec 17(2)(vii)',
     });
   }
 
-  // 4. State Professional Tax Status Alert
-  const stateConfig = STATE_PT_CONFIGS[inputs.state || 'karnataka'];
-  if (!stateConfig.hasProfessionalTax) {
-    alerts.push({
-      id: 'state-pt-exempt-alert',
-      type: 'success',
-      title: `${stateConfig.stateName}: Zero Professional Tax`,
-      message: `Employees based in ${stateConfig.stateName} are exempt from Professional Tax deductions, maximizing monthly in-hand cash.`,
-      sectionReference: stateConfig.legalAct,
-    });
-  } else {
-    alerts.push({
-      id: 'state-pt-active-alert',
-      type: 'info',
-      title: `${stateConfig.stateName}: Professional Tax Applied`,
-      message: `${stateConfig.description} (Annual deduction: ₹${breakdown.professionalTaxAnnual.toLocaleString(
-        'en-IN'
-      )}). Deductible under Sec 16(iii) in Old Tax Regime.`,
-      sectionReference: stateConfig.legalAct,
-    });
-  }
-
-  // 5. City HRA Nuance Alert
-  if (inputs.selectedCity) {
-    const cityNuance = CITY_HRA_NUANCES.find((c) =>
-      c.cityName.toLowerCase().includes(inputs.selectedCity!.toLowerCase())
-    );
-    if (cityNuance && !cityNuance.isStatutoryMetro && cityNuance.isTechHubHighRent) {
-      alerts.push({
-        id: 'city-hra-nuance-alert',
-        type: 'info',
-        title: `HRA Classification Nuance: ${cityNuance.cityName}`,
-        message: `${cityNuance.nuanceExplanation} HRA statutory cap is calculated strictly at ${cityNuance.hraCapPercent}% of Basic Pay.`,
-        sectionReference: 'Income Tax Rule 2A',
-      });
-    }
-  }
-
-  // 6. HRA Rent Exemption Info
-  const annualRent = (inputs.monthlyRentPaid || 0) * 12;
-  const basic10Percent = breakdown.basicAnnual * 0.1;
-  if (inputs.selectedRegime === 'old') {
-    if (annualRent <= 0) {
-      alerts.push({
-        id: 'hra-zero-rent',
-        type: 'info',
-        title: 'HRA Exemption Inactive',
-        message: 'No rent paid is specified. HRA received is 100% taxable under Old Tax Regime.',
-        sectionReference: 'Sec 10(13A)',
-      });
-    } else if (annualRent <= basic10Percent) {
-      alerts.push({
-        id: 'hra-rent-under-10-percent',
-        type: 'info',
-        title: 'Rent ≤ 10% of Basic Pay',
-        message: `Annual rent (₹${(annualRent / 1000).toFixed(0)}k) is less than 10% of Basic (₹${(
-          basic10Percent / 1000
-        ).toFixed(0)}k). Under Rule 2A, HRA exemption is ₹0.`,
-        sectionReference: 'Rule 2A',
-      });
-    }
-  }
-
-  // 7. Statutory PF Cap status
-  if (
-    policy.pfCapAtStatutoryLimit &&
-    breakdown.basicAnnual / 12 > STATUTORY_LIMITS.PF_MONTHLY_WAGE_CEILING
-  ) {
-    alerts.push({
-      id: 'pf-capped-active',
-      type: 'info',
-      title: 'Statutory PF Cap Enforced',
-      message: `PF contribution is capped at 12% of ₹15,000/mo (₹1,800/mo = ₹21,600/yr), maximizing employee monthly cash take-home pay.`,
-      sectionReference: 'EPF Scheme Sec 26A',
-    });
-  }
-
-  // 8. RSU Cross-charge Shield Alert for Employer
+  // 3. Non-deductible RSU Alert for Employer
   if (!policy.rsuCrossChargedToLocalEntity && breakdown.rsuVestedAnnual > 0) {
     alerts.push({
       id: 'rsu-cross-charge-nondeductible',
       type: 'warning',
       title: 'RSU Not Cross-Charged to Entity',
-      message: `RSU perquisite value of ₹${(breakdown.rsuVestedAnnual / 100000).toFixed(
+      message: `RSU perquisite of ₹${(breakdown.rsuVestedAnnual / 100000).toFixed(
         2
-      )}L cannot be claimed as a deductible corporate expense because parent cross-charging is disabled.`,
-      sectionReference: 'Sec 37(1) Deductibility',
+      )}L is not tax deductible by the local entity because cross-charging is disabled.`,
+      sectionReference: 'Sec 37(1)',
     });
   }
 

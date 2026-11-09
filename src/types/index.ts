@@ -18,47 +18,60 @@ export type IndianState =
 export type VestingScheduleType = 'cliff' | 'graded_equal' | 'graded_backloaded' | 'custom';
 export type DispositionAction = 'hold' | 'sell_all' | 'sell_partial';
 
+export type CorporateTaxProfileType =
+  | 'sec_115baa'
+  | 'sec_115bab'
+  | 'sme_upto_1cr'
+  | 'sme_1cr_to_10cr'
+  | 'sme_above_10cr'
+  | 'large_above_10cr'
+  | 'custom';
+
 export interface CompanyPolicy {
   // PF Policy
-  pfCapAtStatutoryLimit: boolean; // true = 12% on ₹15k cap (₹1,800/mo), false = 12% of actual Basic
+  pfCapAtStatutoryLimit: boolean;
   enableVPF: boolean;
-  vpfPercentage: number; // additional % of basic by employee
+  vpfPercentage: number;
 
   // Gratuity Policy
-  gratuityIncludedInCTC: boolean; // true = included in gross CTC, false = over and above CTC
-  gratuityRatePercent: number; // default 4.81%
+  gratuityIncludedInCTC: boolean;
+  gratuityRatePercent: number;
 
   // HRA Allocation Policy
-  defaultHraPercentOfBasic: number; // default 50% for metro / 40% for non-metro
+  defaultHraPercentOfBasic: number;
 
   // Superannuation & NPS Policy
   employerNpsEnabled: boolean;
-  employerNpsPercent: number; // 0-14%, default 10% for private
+  employerNpsPercent: number; // 0-14% (typically 10%)
   superannuationEnabled: boolean;
-  superannuationPercent: number; // e.g. 0% or 5%
+  superannuationPercent: number;
 
   // RSU Cross-Charge Policy
-  rsuCrossChargedToLocalEntity: boolean; // true = tax deductible for local Indian employer
+  rsuCrossChargedToLocalEntity: boolean;
 
-  // Corporate Tax Policy (for employer mode)
-  corporateTaxRate: number; // default 25.17% (22% + surcharge + cess) or 25%
+  // Corporate Tax Policy (Employer Mode)
+  corporateTaxProfile: CorporateTaxProfileType;
+  corporateBaseRate: number; // e.g. 22%, 15%, 25%, 30%
+  corporateSurchargeRate: number; // e.g. 0%, 7%, 10%, 12%
+  corporateCessRate: number; // 4% Higher Education Cess
+  corporateTaxRate: number; // Combined effective corporate tax rate
 }
 
 export interface CompensationInputs {
   ctcAnnual: number;
-  basicPercentOfCTC: number; // e.g. 40% or 50%
+  basicPercentOfCTC: number;
   customBasicAnnual?: number;
-  hraPercentOfBasic: number; // e.g. 50% or 40%
+  hraPercentOfBasic: number;
 
-  // Work Location & State Nuances
+  // Location & State
   state?: IndianState;
   selectedCity?: string;
   professionalTaxAnnual?: number;
   customProfessionalTaxOverride?: boolean;
 
-  // Specific components
+  // Allowances & Meal / LTC
   ltaAnnual: number;
-  foodCouponAnnual: number;
+  foodCouponAnnual: number; // Meal coupons (Sodexo / Pluxee / Zaggle)
   booksAndPeriodicalsAnnual: number;
   communicationAnnual: number;
   otherFlexiAnnual: number;
@@ -72,16 +85,19 @@ export interface CompensationInputs {
   monthlyRentPaid: number;
   cityTier: CityTier;
 
+  // NPS Employee Contributions
+  employeeNpsTier1Percent: number; // 0-10% of Basic Pay (80CCD(1))
+  employeeNpsTier2Annual: number; // Voluntary liquid layer
+
   // Old Regime Deductions
-  deduction80C: number; // Max 1.5L
-  deduction80D: number; // Health insurance
-  deduction80CCD1B: number; // Self NPS (Max 50k)
-  deductionHomeLoanInterest: number; // Sec 24b (Max 2L)
-  deduction80E: number; // Education loan interest
-  deduction80TTA: number; // Savings bank interest (Max 10k)
+  deduction80C: number;
+  deduction80D: number;
+  deduction80CCD1B: number; // Additional self NPS (Max 50k)
+  deductionHomeLoanInterest: number;
+  deduction80E: number;
+  deduction80TTA: number;
   otherExemptionsOldRegime: number;
 
-  // Chosen regime in UI
   selectedRegime: TaxRegime;
 }
 
@@ -89,12 +105,13 @@ export interface CompensationBreakdown {
   ctcAnnual: number;
   basicAnnual: number;
   hraAnnual: number;
-  specialAllowanceAnnual: number; // Auto-balanced spillover
+  specialAllowanceAnnual: number;
   ltaAnnual: number;
   otherAllowancesAnnual: number;
+  foodCouponAnnual: number;
   variablePayAnnual: number;
 
-  // Employer Contributions (Cost to Company side)
+  // Employer Contributions
   employerPFAnnual: number;
   gratuityAnnual: number;
   employerNPSAnnual: number;
@@ -105,13 +122,14 @@ export interface CompensationBreakdown {
   rsuVestedAnnual: number;
   rsuUnvestedAnnual: number;
 
-  // Gross Pay & Take-home Components
-  grossSalaryAnnual: number; // CTC minus Employer Retirals & unvested RSUs (or Gross Earnings)
+  // Gross Earnings
+  grossSalaryAnnual: number;
 
   // Employee Deductions from Pay Slip
   employeePFAnnual: number;
   employeeVPFAnnual: number;
-  employeeNPSAnnual: number;
+  employeeNpsTier1Annual: number;
+  employeeNpsTier2Annual: number;
   professionalTaxAnnual: number;
   professionalTaxMonthly: number;
   stateApplied: IndianState;
@@ -141,6 +159,7 @@ export interface TaxCalculationResult {
   hraExemption: number;
   hraExemptionStateNote?: string;
   ltaExemption: number;
+  mealCouponExemption: number;
   chapterVIA80CDeduction: number;
   chapterVIA80DDeduction: number;
   chapterVIA80CCD1BDeduction: number;
@@ -164,7 +183,7 @@ export interface TaxCalculationResult {
   totalTaxLiabilityMonthly: number;
   effectiveTaxRatePercent: number;
 
-  // Net Take-Home (In-Hand Pay)
+  // Net Take-Home
   annualInHandSalary: number;
   monthlyInHandSalary: number;
 }
@@ -193,6 +212,10 @@ export interface EmployerTaxShield {
     otherNonDeductible: number;
     totalNonDeductible: number;
   };
+  taxProfileName: string;
+  baseCorporateTaxRate: number;
+  surchargeRatePercent: number;
+  cessRatePercent: number;
   corporateTaxRate: number;
   corporateTaxShieldAmount: number;
   effectiveEmployerNetCost: number;
@@ -237,24 +260,28 @@ export interface RSUTaxDetails {
   grantPriceUSD: number;
   usdToInrRate: number;
   fmvAtVestingUSD: number;
-  unitsVested: number; // for single batch or current active year
+  unitsVested: number;
   holdingPeriodMonths: number;
   salePriceUSD: number;
   isDomesticListed: boolean;
 
-  // 1. Vesting Schedules
+  // Vesting Schedules
   vestingScheduleType?: VestingScheduleType;
-  vestingDurationYears?: number; // e.g. 4 years
-  currentTaxYearNumber?: number; // 1, 2, 3, 4
-  customVestingPercentages?: number[]; // [25, 25, 25, 25] or [10, 20, 30, 40]
+  vestingDurationYears?: number;
+  currentTaxYearNumber?: number;
+  customVestingPercentages?: number[];
 
-  // 2. Reload RSUs
+  // Startup ESOP Deferral (Section 80-IAC / Section 192(1C))
+  isDPIITStartupEligible?: boolean;
+  deferralYearsLimit?: number; // default 5 years / 60 months
+
+  // Reload RSUs
   hasReloadFeature?: boolean;
-  reloadGrantRatioPercent?: number; // e.g. 50% or 100% of withheld shares re-granted
+  reloadGrantRatioPercent?: number;
   reloadFMVUSD?: number;
   reloadVestingPeriodMonths?: number;
 
-  // 3. Disqualifying Dispositions & Capital Gains
+  // Disqualifying Dispositions & Capital Gains
   dispositionAction?: DispositionAction;
   soldUnits?: number;
 }
@@ -266,6 +293,12 @@ export interface RSUTaxCalculationResult {
   perquisiteTaxINR: number;
   effectiveMarginalTaxRate: number;
 
+  // ESOP Deferral (Section 80-IAC)
+  isTdsDeferred: boolean;
+  tdsDeferredAmountINR: number;
+  immediateTdsPayableINR: number;
+  deferralDueDateNote: string;
+
   // Vesting Schedule Breakdown across years
   vestingScheduleBreakdown: VestingYearDetail[];
 
@@ -276,10 +309,10 @@ export interface RSUTaxCalculationResult {
   totalSaleProceedsINR: number;
   capitalGainsINR: number;
   isLTCG: boolean;
-  isDisqualifyingDisposition: boolean; // Flagged when sold before LTCG holding period (12m domestic / 24m foreign)
+  isDisqualifyingDisposition: boolean;
   capitalGainsTaxRatePercent: number;
   capitalGainsTaxINR: number;
-  disqualifyingTaxPenaltyINR: number; // Difference between STCG slab and preferential LTCG
+  disqualifyingTaxPenaltyINR: number;
 
   // Reload RSU impact
   reloadUnitsAwarded: number;

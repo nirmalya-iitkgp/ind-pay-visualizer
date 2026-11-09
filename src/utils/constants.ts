@@ -304,8 +304,85 @@ export const STATUTORY_LIMITS = {
   NEW_REGIME_87A_INCOME_LIMIT: 700000, // Zero tax up to 7L taxable (7.75L with standard deduction)
   NEW_REGIME_87A_MAX_REBATE: 25000,
 
+  // Food / Meal Coupons Limit (Rule 3(7)(iii): ₹50/meal * 2 meals * 22 days * 12 months)
+  MEAL_COUPON_ANNUAL_EXEMPT_LIMIT: 26400,
+
   // Health & Education Cess
   CESS_RATE: 0.04, // 4%
+};
+
+export interface CorporateTaxProfileConfig {
+  profile: string;
+  name: string;
+  section: string;
+  baseRate: number;
+  surchargeRate: number;
+  cessRate: number;
+  effectiveRate: number;
+  description: string;
+}
+
+export const CORPORATE_TAX_PROFILES: Record<string, CorporateTaxProfileConfig> = {
+  sec_115baa: {
+    profile: 'sec_115baa',
+    name: 'Section 115BAA (Domestic Companies)',
+    section: 'Sec 115BAA',
+    baseRate: 22,
+    surchargeRate: 10,
+    cessRate: 4,
+    effectiveRate: 25.17, // 22 * 1.10 * 1.04 = 25.168%
+    description: 'Universal 22% base + 10% statutory surcharge + 4% cess. No MAT applicability.',
+  },
+  sec_115bab: {
+    profile: 'sec_115bab',
+    name: 'Section 115BAB (New Manufacturing)',
+    section: 'Sec 115BAB',
+    baseRate: 15,
+    surchargeRate: 10,
+    cessRate: 4,
+    effectiveRate: 17.16, // 15 * 1.10 * 1.04 = 17.16%
+    description: 'Concessional 15% rate for new manufacturing setups registered post-2019.',
+  },
+  sme_upto_1cr: {
+    profile: 'sme_upto_1cr',
+    name: 'SME Company (Turnover ≤ ₹400 Cr, Income ≤ ₹1 Cr)',
+    section: 'Old Corporate Regime',
+    baseRate: 25,
+    surchargeRate: 0,
+    cessRate: 4,
+    effectiveRate: 26.0,
+    description: '25% base + 0% surcharge + 4% Higher Education Cess.',
+  },
+  sme_1cr_to_10cr: {
+    profile: 'sme_1cr_to_10cr',
+    name: 'SME Company (Turnover ≤ ₹400 Cr, Income ₹1-10 Cr)',
+    section: 'Old Corporate Regime',
+    baseRate: 25,
+    surchargeRate: 7,
+    cessRate: 4,
+    effectiveRate: 27.82, // 25 * 1.07 * 1.04 = 27.82%
+    description: '25% base + 7% surcharge on taxable income > ₹1 Cr + 4% cess.',
+  },
+  sme_above_10cr: {
+    profile: 'sme_above_10cr',
+    name: 'SME Company (Turnover ≤ ₹400 Cr, Income > ₹10 Cr)',
+    section: 'Old Corporate Regime',
+    baseRate: 25,
+    surchargeRate: 12,
+    cessRate: 4,
+    effectiveRate: 29.12, // 25 * 1.12 * 1.04 = 29.12%
+    description: '25% base + 12% surcharge on taxable income > ₹10 Cr + 4% cess.',
+  },
+  large_above_10cr: {
+    profile: 'large_above_10cr',
+    name: 'Large Corporate (Turnover > ₹400 Cr, Income > ₹10 Cr)',
+    section: 'Standard Enterprise',
+    baseRate: 30,
+    surchargeRate: 12,
+    cessRate: 4,
+    effectiveRate: 34.94, // 30 * 1.12 * 1.04 = 34.944%
+    description: '30% base + 12% corporate surcharge + 4% Higher Education Cess.',
+  },
 };
 
 export const DEFAULT_COMPANY_POLICY: CompanyPolicy = {
@@ -320,7 +397,11 @@ export const DEFAULT_COMPANY_POLICY: CompanyPolicy = {
   superannuationEnabled: false,
   superannuationPercent: 0,
   rsuCrossChargedToLocalEntity: true,
-  corporateTaxRate: 25.17, // Standard effective corporate tax (22% base + 10% surcharge + 4% cess)
+  corporateTaxProfile: 'sec_115baa',
+  corporateBaseRate: 22,
+  corporateSurchargeRate: 10,
+  corporateCessRate: 4,
+  corporateTaxRate: 25.17,
 };
 
 export const DEFAULT_COMPENSATION_INPUTS: CompensationInputs = {
@@ -339,6 +420,8 @@ export const DEFAULT_COMPENSATION_INPUTS: CompensationInputs = {
   cityTier: 'non-metro',
   selectedCity: 'Bangalore (Bengaluru)',
   monthlyRentPaid: 25000,
+  employeeNpsTier1Percent: 0,
+  employeeNpsTier2Annual: 0,
   selectedRegime: 'new',
   deduction80C: 150000,
   deduction80D: 25000,
